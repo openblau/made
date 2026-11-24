@@ -52,6 +52,45 @@ struct RemoteDesktopKeyboardInputTests {
         #expect(events.isEmpty)
     }
 
+    @Test("Paste releases held Command, types line breaks and tabs as keys, then restores Command")
+    func pasteTypesClipboardBetweenModifierReleaseAndRestore() {
+        let input = RemoteDesktopKeyboardInput()
+        var events: [RemoteDesktopKeyboardInput.KeyEvent] = []
+        _ = input.beginSession { events.append($0); return true }
+
+        #expect(input.pasteText("a\r\nb\t\u{1b}é", localChangeCount: 1, heldModifiers: [0xffeb]) == .typed)
+        #expect(events == [.init(keysym: 0xffeb, isDown: false)]
+            + keyEvents([0x61, 0xff0d, 0x62, 0xff09, 0xe9])
+            + [.init(keysym: 0xffeb, isDown: true)])
+    }
+
+    @Test("A remote copy keeps Command-V on the remote until the Mac clipboard changes")
+    func remoteCopyWinsUntilLocalClipboardChanges() {
+        let input = RemoteDesktopKeyboardInput()
+        var events: [RemoteDesktopKeyboardInput.KeyEvent] = []
+        _ = input.beginSession { events.append($0); return true }
+
+        input.noteRemoteCopy(localChangeCount: 4)
+        #expect(input.pasteText("mac", localChangeCount: 4, heldModifiers: []) == .forwardToRemote)
+        #expect(events.isEmpty)
+        #expect(input.pasteText("mac", localChangeCount: 5, heldModifiers: []) == .typed)
+        #expect(events == keyEvents([0x6d, 0x61, 0x63]))
+    }
+
+    @Test("Paste forwards when there is no text and refuses oversized or disconnected pastes")
+    func pasteBoundsAndFallbacks() {
+        let input = RemoteDesktopKeyboardInput()
+        var events: [RemoteDesktopKeyboardInput.KeyEvent] = []
+        #expect(input.pasteText("a", localChangeCount: 1, heldModifiers: []) == .forwardToRemote)
+        _ = input.beginSession { events.append($0); return true }
+
+        #expect(input.pasteText(nil, localChangeCount: 1, heldModifiers: []) == .forwardToRemote)
+        #expect(input.pasteText("\u{1b}", localChangeCount: 1, heldModifiers: []) == .forwardToRemote)
+        let oversized = String(repeating: "a", count: RemoteDesktopKeyboardInput.maximumPasteScalars + 1)
+        #expect(input.pasteText(oversized, localChangeCount: 1, heldModifiers: []) == .rejected)
+        #expect(events.isEmpty)
+    }
+
     @Test("Reconnect rejects stale text and Enter while allowing the new session")
     func reconnectInvalidatesCapturedTarget() {
         let input = RemoteDesktopKeyboardInput()

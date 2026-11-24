@@ -62,7 +62,7 @@ final class RunnersViewController: NSViewController, CockpitPanePresenting, Cock
         view = RRBackgroundView()
         tabs.orientation = .horizontal
         tabs.alignment = .centerY
-        tabs.spacing = 6
+        tabs.spacing = CockpitPageLayout.controlGap
         tabStrip.setAccessibilityIdentifier("runners.sources")
         search.placeholderString = "Filter runners"
         search.setAccessibilityLabel("Filter runners")
@@ -92,23 +92,23 @@ final class RunnersViewController: NSViewController, CockpitPanePresenting, Cock
         actions.addArrangedSubview(refresh)
         toolbar.orientation = .horizontal
         toolbar.alignment = .centerY
-        toolbar.spacing = 10
-        toolbar.edgeInsets = NSEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
+        toolbar.spacing = CockpitPageLayout.controlGap
         for control in [summary, toolbarSpacer] { toolbar.addArrangedSubview(control) }
         let footer = RRUI.stack([updated], axis: .horizontal)
-        footer.edgeInsets = NSEdgeInsets(top: 4, left: 12, bottom: 8, right: 12)
-        let stack = RRUI.stack([tabStrip, toolbar, error, body, footer], spacing: 8)
+        let stack = RRUI.stack([tabStrip, toolbar, error, body, footer], spacing: CockpitPageLayout.sectionGap)
         RRUI.fillWidth(stack)
-        RRUI.pin(stack, to: view)
+        RRUI.pin(stack, to: view, inset: CockpitPageLayout.margin)
         collection.collectionViewLayout = collectionLayout
         collection.dataSource = self
         collection.delegate = self
         collection.isSelectable = true
         collection.backgroundColors = [.clear]
         collection.register(RunnerCollectionItem.self, forItemWithIdentifier: RunnerCollectionItem.identifier)
-        collectionLayout.minimumInteritemSpacing = 12
-        collectionLayout.minimumLineSpacing = 12
-        collectionLayout.sectionInset = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        collectionLayout.minimumInteritemSpacing = CockpitPageLayout.sectionGap
+        collectionLayout.minimumLineSpacing = CockpitPageLayout.sectionGap
+        collectionScroll.contentView.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(updateCollectionSize),
+                                               name: NSView.frameDidChangeNotification, object: collectionScroll.contentView)
         collectionScroll.documentView = collection
         collectionScroll.hasVerticalScroller = true
         collectionScroll.drawsBackground = false
@@ -292,10 +292,12 @@ final class RunnersViewController: NSViewController, CockpitPanePresenting, Cock
         show(container)
     }
 
-    private func updateCollectionSize() {
-        let available = max(240, collectionScroll.contentSize.width - 24)
-        let columns = max(1, floor((available + 12) / (layout.minimumWidth * RRUI.zoom + 12)))
-        let size = NSSize(width: floor((available - (columns - 1) * 12) / columns), height: (layout == .compact ? 88 : 226) * RRUI.zoom)
+    @objc private func updateCollectionSize() {
+        let available = collectionScroll.contentSize.width
+        guard available > 0 else { return }
+        let gap = collectionLayout.minimumInteritemSpacing
+        let columns = max(1, floor((available + gap) / (layout.minimumWidth * RRUI.zoom + gap)))
+        let size = NSSize(width: floor((available - (columns - 1) * gap) / columns), height: (layout == .compact ? 88 : 226) * RRUI.zoom)
         if collectionLayout.itemSize != size { collectionLayout.itemSize = size; collectionLayout.invalidateLayout() }
     }
 

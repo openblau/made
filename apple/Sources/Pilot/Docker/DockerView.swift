@@ -269,18 +269,20 @@ final class DockerViewController: NSViewController, NSTableViewDataSource, NSTab
         super.viewDidLayout()
         let width = view.bounds.width
         let zoom = CockpitUIZoomController.shared.factor
-        let headerHeight: CGFloat = 46 * zoom
-        status.frame = NSRect(x: 16, y: 12, width: max(0, width - 32), height: 24 * zoom)
+        let margin = CockpitPageLayout.margin
+        let innerWidth = max(0, width - 2 * margin)
+        let headerHeight = margin + 24 * zoom + CockpitPageLayout.sectionGap
+        status.frame = NSRect(x: margin, y: margin, width: innerWidth, height: 24 * zoom)
         searchWidth?.constant = 180 * zoom
         search.font = CockpitTypography.font(size: 12)
         status.font = CockpitTypography.font(size: 12)
         stoppedLabel.font = CockpitTypography.font(size: 12)
         errorText.font = CockpitTypography.font(size: 12)
         let errorHeight: CGFloat = errorText.isHidden ? 0 : 52 * zoom
-        errorText.frame = NSRect(x: 16, y: headerHeight, width: max(0, width - 70), height: errorHeight)
-        dismissError.frame = NSRect(x: width - 44, y: headerHeight + 8, width: 28, height: 24)
+        errorText.frame = NSRect(x: margin, y: headerHeight, width: max(0, innerWidth - 28 - CockpitPageLayout.controlGap), height: errorHeight)
+        dismissError.frame = NSRect(x: width - margin - 28, y: headerHeight + 8, width: 28, height: 24)
         let top = headerHeight + errorHeight
-        scroll.frame = NSRect(x: 8, y: top, width: max(0, width - 16), height: max(0, view.bounds.height - top - 8))
+        scroll.frame = NSRect(x: margin, y: top, width: innerWidth, height: max(0, view.bounds.height - top - margin))
         table.tableColumns.first?.width = scroll.contentSize.width
         let centerY = top + max(0, view.bounds.height - top - 170) / 2
         emptyTitle.font = CockpitTypography.font(size: 20, weight: .semibold)

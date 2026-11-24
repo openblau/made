@@ -1,6 +1,16 @@
 import AppKit
 import QuartzCore
 
+enum CockpitPageLayout {
+    static let margin = LiquidGlassMetrics.Spacing.medium
+    static let sectionGap = LiquidGlassMetrics.Spacing.small
+    static let controlGap = LiquidGlassMetrics.Spacing.xSmall
+
+    static var panelInsets: NSEdgeInsets {
+        NSEdgeInsets(top: margin, left: margin, bottom: margin, right: margin)
+    }
+}
+
 /// The same quiet, borderless surface used by the inspector's usage cards.
 @MainActor
 enum CockpitCardStyle {
@@ -373,10 +383,9 @@ final class CockpitTabStrip: NSView {
         super.layout()
         let zoom = CGFloat(CockpitUIZoomController.shared.factor)
         let padding = LiquidGlassMetrics.Spacing.xxSmall * zoom
-        let inset = LiquidGlassMetrics.Spacing.xSmall * zoom
         let fitting = stack.fittingSize
         let rowHeight = max(28 * zoom, fitting.height)
-        let width = max(bounds.width, ceil(fitting.width) + inset * 2)
+        let width = max(bounds.width, ceil(fitting.width))
         let contentHeight = rowHeight + padding * 2
         let height = NSScrollView.frameSize(
             forContentSize: NSSize(width: bounds.width, height: contentHeight),
@@ -387,7 +396,7 @@ final class CockpitTabStrip: NSView {
         if stripHeight.constant != height { stripHeight.constant = height }
         scrollView.frame = NSRect(x: 0, y: 0, width: bounds.width, height: height)
         document.frame = NSRect(x: 0, y: 0, width: width, height: contentHeight)
-        stack.frame = NSRect(x: inset, y: padding, width: width - inset * 2, height: rowHeight)
+        stack.frame = NSRect(x: 0, y: padding, width: width, height: rowHeight)
         scrollView.tile()
     }
 }

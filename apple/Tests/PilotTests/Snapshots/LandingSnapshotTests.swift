@@ -67,9 +67,12 @@ final class LandingSnapshotTests: XCTestCase {
             }, globalFactory: { mode in
                 switch mode {
                 case .notes: return NotesViewController(store: fixtures.workspace, defaults: fixtures.defaults)
-                case .remoteDesktop: return RemoteDesktopViewController(store: fixtures.workspace, isLive: false)
+                case .remoteDesktop:
+                    return RemoteDesktopViewController(store: fixtures.workspace,
+                                                       groups: RemoteDesktopGroups(defaults: fixtures.defaults), isLive: false)
                 case .docker: return DockerViewController(store: fixtures.docker)
                 case .runners: return RunnersViewController(store: fixtures.runners, defaults: fixtures.defaults, isLive: false)
+                case .mockups: return MockupsViewController(defaults: fixtures.defaults)
                 case .agenticUse:
                     let controller = NSViewController()
                     controller.view = SnapshotDashboardScrollView(dashboard: AgenticUseDashboard(
@@ -86,7 +89,7 @@ final class LandingSnapshotTests: XCTestCase {
         }
         let scenes: [(String, SidebarSelection)] = [
             ("workspace", .workspace(workspace.id)), ("notes", .notes), ("remote-desktop", .remoteDesktop),
-            ("docker", .docker), ("agentic-use", .agenticUse), ("runners", .runners),
+            ("docker", .docker), ("agentic-use", .agenticUse), ("runners", .runners), ("mockups", .mockups),
         ]
         let window = try XCTUnwrap(shell.window)
         shell.showWindow(nil)

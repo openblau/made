@@ -208,7 +208,7 @@ struct AgenticUseNativePresentationTests {
                     #expect(card.bounds.contains(label.frame))
                 }
             }
-            if models.frame.minX > 8 {
+            if models.frame.minX > CockpitPageLayout.margin {
                 let columns = table.tableColumns.reduce(CGFloat(0)) { $0 + $1.width }
                     + CGFloat(table.numberOfColumns) * table.intercellSpacing.width
                 #expect(columns <= scroll.contentSize.width + 1)

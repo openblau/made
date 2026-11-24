@@ -473,7 +473,11 @@ final class NativeCockpitWindowTests: XCTestCase {
                               "Drawing must intercept sidebar, inspector, and toolbar clicks")
             }
         }
-        canvas.cancelOperation(nil)
+        let escape = try XCTUnwrap(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber, context: nil, characters: "\u{1b}",
+            charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53))
+        NSApp.sendEvent(escape)
         XCTAssertFalse(controller.isDrawingActive)
         XCTAssertNil(canvas.view.superview)
         controller.setDrawingActive(true)
@@ -1217,6 +1221,78 @@ private final class Fixture {
         })
     }
     func cleanUp() { cache.closeAll(); defaults.removePersistentDomain(forName: defaultsName) }
+}
+
+extension NativeCockpitWindowTests {
+    @MainActor
+    func testTerminalControlsStayVisibleBesideNewTabWithInspectorOpen() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        fixture.store.addWorkingWorkspace()
+        let controller = fixture.window()
+        controller.inspectorFactory = { _ in FixturePaneController() }
+        controller.featureToolbarFactory = { TerminalFastCommandToolbarView(pane: $0) }
+        let window = try XCTUnwrap(controller.window)
+        controller.showWindow(nil)
+        defer { window.orderOut(nil); controller.windowWillClose(Notification(name: NSWindow.willCloseNotification)) }
+        window.setContentSize(NSSize(width: 1440, height: 920))
+        controller.toggleInspector()
+        let toolbar = try XCTUnwrap(window.toolbar)
+        for _ in 0..<6 {
+            try await Task.sleep(for: .milliseconds(250))
+            let visible = Set(toolbar.visibleItems?.map(\.itemIdentifier) ?? [])
+            for item in toolbar.items where !item.isHidden && (item.action != nil || item.itemIdentifier.rawValue == "cockpit.feature") {
+                XCTAssertTrue(visible.contains(item.itemIdentifier), "Unexpected overflow of \(item.itemIdentifier)")
+            }
+        }
+    }
+
+    @MainActor
+    func testNewWorkspaceFitsInTheSidebarToolbarAtMinimumSidebarWidth() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        fixture.store.addWorkingWorkspace()
+        let controller = fixture.window()
+        let window = try XCTUnwrap(controller.window)
+        controller.showWindow(nil)
+        defer { window.orderOut(nil); controller.windowWillClose(Notification(name: NSWindow.willCloseNotification)) }
+        window.setContentSize(NSSize(width: 1440, height: 920))
+        let split = try XCTUnwrap(window.contentViewController as? NSSplitViewController)
+        let sidebar = try XCTUnwrap(split.splitViewItems.first)
+        split.splitView.setPosition(sidebar.minimumThickness, ofDividerAt: 0)
+        window.layoutIfNeeded()
+        XCTAssertFalse(sidebar.isCollapsed)
+        XCTAssertEqual(sidebar.viewController.view.frame.width, sidebar.minimumThickness, accuracy: 1)
+        let toolbar = try XCTUnwrap(window.toolbar)
+        let identifiers = toolbar.items.map(\.itemIdentifier)
+        let newWorkspace = try XCTUnwrap(identifiers.firstIndex { $0.rawValue == "cockpit.new-workspace" })
+        let divider = try XCTUnwrap(identifiers.firstIndex(of: .sidebarTrackingSeparator))
+        XCTAssertLessThan(newWorkspace, divider, "New Workspace belongs to the sidebar's toolbar region")
+        try await Task.sleep(for: .milliseconds(250))
+        let visible = Set(toolbar.visibleItems?.map(\.itemIdentifier) ?? [])
+        for item in toolbar.items where !item.isHidden && item.action != nil {
+            XCTAssertTrue(visible.contains(item.itemIdentifier),
+                          "\(item.itemIdentifier.rawValue) must not overflow beside a minimum-width sidebar")
+        }
+    }
+
+    @MainActor
+    func testWorkspaceRefreshKeepsToolbarPresentationStable() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        fixture.store.addWorkspace()
+        let controller = fixture.window(paneFactory: { _, _ in FixturePaneController() })
+        controller.showWindow(nil)
+        let window = try XCTUnwrap(controller.window)
+        defer { window.orderOut(nil); controller.windowWillClose(Notification(name: NSWindow.willCloseNotification)) }
+        let draw = try XCTUnwrap(window.toolbar?.items.first { $0.itemIdentifier.rawValue == "cockpit.draw" })
+        XCTAssertFalse(window.toolbar?.items.contains { $0.itemIdentifier == .inspectorTrackingSeparator } == true)
+        let image = try XCTUnwrap(draw.image)
+        for _ in 0..<3 {
+            controller.refresh()
+            XCTAssertTrue(draw.image === image, "A background refresh must preserve the toolbar image")
+        }
+    }
 }
 
 @MainActor

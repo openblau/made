@@ -77,8 +77,7 @@ final class RemoteDesktopViewController: NSViewController, CockpitPanePresenting
         view = RRBackgroundView(frame: NSRect(x: 0, y: 0, width: 1000, height: 800))
         header.orientation = .horizontal
         header.alignment = .centerY
-        header.spacing = 8
-        header.edgeInsets = NSEdgeInsets(top: 6, left: 12, bottom: 2, right: 12)
+        header.spacing = CockpitPageLayout.controlGap
         groupTabs.setAccessibilityIdentifier("remote.groups")
         groupTabs.setContentHuggingPriority(.defaultHigh, for: .horizontal)
         groupTabs.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -108,9 +107,9 @@ final class RemoteDesktopViewController: NSViewController, CockpitPanePresenting
         addComputer.setAccessibilityIdentifier("remote.add-computer")
         actions.setAccessibilityIdentifier("remote.toolbar-actions")
         actions.setGroups([[addComputer]])
-        let stack = RRUI.stack([header, grid], spacing: 4)
+        let stack = RRUI.stack([header, grid], spacing: CockpitPageLayout.sectionGap)
         RRUI.fillWidth(stack)
-        RRUI.pin(stack, to: view)
+        RRUI.pin(stack, to: view, inset: CockpitPageLayout.margin)
         zoomObservation = RRZoomObservation { [weak self] in
             if let self {
                 RRUI.zoomControls(in: self.view)
@@ -291,8 +290,17 @@ final class RemoteDesktopViewController: NSViewController, CockpitPanePresenting
             guard let self else { return }
             self.removalID = nil
             if response == .alertFirstButtonReturn {
-                self.sessions.endSession(for: connection.id)
+                let removedID = connection.id
+                let wasSelected = self.store.selectedRemoteConnectionID == removedID
+                let group = self.groups.selectedGroup
+                self.sessions.endSession(for: removedID)
                 self.store.deleteRemoteConnection(connection)
+                // The store falls back to the first saved machine, which may
+                // live in another group; selecting it would switch tabs. Stay
+                // in this group, even when the removal leaves it empty.
+                if wasSelected, let group, !self.store.remoteConnections.contains(where: { $0.id == removedID }) {
+                    self.store.selectedRemoteConnectionID = group.connectionIDs.first { $0 != removedID }
+                }
             }
             self.store.remoteConnectionPendingClose = nil
             self.render()
@@ -334,11 +342,11 @@ private final class RemoteDesktopGridView: NSView {
     /// Frame-managed cards need usable dimensions before their child constraints
     /// are installed, including while the controller is loaded offscreen.
     func frameForCell(at index: Int) -> NSRect {
-        let gap: CGFloat = 12
-        let width = ((bounds.width > 28 ? bounds.width : 1000) - 28) / 2
-        let height = ((bounds.height > 28 ? bounds.height : 748) - 28) / 2
-        return NSRect(x: 8 + CGFloat(index % 2) * (width + gap),
-                      y: 8 + CGFloat(index / 2) * (height + gap), width: width, height: height)
+        let gap = CockpitPageLayout.sectionGap
+        let width = max(0, (bounds.width > 0 ? bounds.width : 1000) - gap) / 2
+        let height = max(0, (bounds.height > 0 ? bounds.height : 748) - gap) / 2
+        return NSRect(x: CGFloat(index % 2) * (width + gap),
+                      y: CGFloat(index / 2) * (height + gap), width: width, height: height)
     }
 }
 
@@ -393,7 +401,7 @@ private final class RemoteConnectionViewController: NSViewController, NSTextFiel
     private let save = RRSwitch("Save password")
     private let automatic = RRSwitch("Connect automatically")
     private let highPerformance = RRSwitch("High Performance")
-    private let clipboard = NSButton(checkboxWithTitle: "Share clipboard", target: nil, action: nil)
+    private let clipboard = RemoteTabStopCheckbox(checkboxWithTitle: "Share clipboard", target: nil, action: nil)
     private let reconnect = RRButton("Reconnect", action: {})
     private var viewer: RemoteDesktopViewer?
     private var visible = false
@@ -451,7 +459,7 @@ private final class RemoteConnectionViewController: NSViewController, NSTextFiel
         highPerformance.state = isLive && VNCPreferences.isHighPerformanceEnabled(id: connection.id) ? .on : .off
         clipboard.target = self
         clipboard.action = #selector(clipboardChanged)
-        clipboard.toolTip = "Allows this remote VNC server to read and replace your Mac clipboard."
+        clipboard.toolTip = "⌘V types your Mac clipboard text into this computer. VNC servers that sync clipboards can also read and replace your Mac clipboard after a reconnect."
         clipboard.state = isLive && VNCPreferences.isClipboardRedirectionEnabled(id: connection.id) ? .on : .off
         reconnect.perform = { [weak self] in self?.reconnectSession() }
         let footer = RRUI.stack([clipboard, RRUI.spacer(), status, reconnect], axis: .horizontal)
@@ -626,7 +634,7 @@ private final class RemoteConnectionViewController: NSViewController, NSTextFiel
         let options = RRUI.stack([save.row, automatic.row, highPerformance.row], spacing: 0)
         RRUI.fillWidth(options)
         let form = RRUI.stack([identity, usernameGroup, passwordGroup, options], spacing: 10)
-        form.setCustomSpacing(12, after: identity)
+        form.setCustomSpacing(10, after: identity)
         form.setCustomSpacing(8, after: passwordGroup)
         form.setCustomSpacing(8, after: options)
         if let error {
@@ -664,12 +672,16 @@ private final class RemoteConnectionViewController: NSViewController, NSTextFiel
             form.leadingAnchor.constraint(greaterThanOrEqualTo: document.leadingAnchor, constant: 20),
             form.trailingAnchor.constraint(lessThanOrEqualTo: document.trailingAnchor, constant: -20),
             form.centerXAnchor.constraint(equalTo: document.centerXAnchor),
-            form.topAnchor.constraint(greaterThanOrEqualTo: document.topAnchor, constant: 12),
-            form.bottomAnchor.constraint(lessThanOrEqualTo: document.bottomAnchor, constant: -12),
+            form.topAnchor.constraint(greaterThanOrEqualTo: document.topAnchor, constant: 8),
+            form.bottomAnchor.constraint(lessThanOrEqualTo: document.bottomAnchor, constant: -8),
             form.centerYAnchor.constraint(equalTo: document.centerYAnchor),
         ])
         RRUI.pin(scroll, to: content)
         RRUI.zoomControls(in: form)
+        // The window's computed key view loop would also stop on labels and
+        // skip the options, so Tab follows an explicit order instead.
+        for toggle in [save, automatic, highPerformance] { toggle.alwaysTabStop = true }
+        document.tabOrder = [username, password, save, automatic, highPerformance, clipboard]
     }
 
     @objc private func connect() {
@@ -713,9 +725,31 @@ private final class RemoteConnectionViewController: NSViewController, NSTextFiel
     }
 }
 
+/// A checkbox that is a Tab stop even when Keyboard Navigation is off.
+@MainActor
+private final class RemoteTabStopCheckbox: NSButton {
+    override var canBecomeKeyView: Bool { (isEnabled && !isHiddenOrHasHiddenAncestor) || super.canBecomeKeyView }
+}
+
 @MainActor
 private final class RemoteCredentialsDocument: NSView {
     override var isFlipped: Bool { true }
+    /// The views Tab visits, in order, wrapping from the last to the first.
+    var tabOrder: [NSView] = [] { didSet { applyTabOrder() } }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else { return }
+        // A window computes its default key view loop from the view hierarchy
+        // when it is first shown, replacing any order set before that. Apply
+        // ours again once the window has done so.
+        applyTabOrder()
+        DispatchQueue.main.async { [weak self] in self?.applyTabOrder() }
+    }
+
+    private func applyTabOrder() {
+        for (index, stop) in tabOrder.enumerated() { stop.nextKeyView = tabOrder[(index + 1) % tabOrder.count] }
+    }
 }
 
 @MainActor

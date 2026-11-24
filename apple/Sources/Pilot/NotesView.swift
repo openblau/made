@@ -688,13 +688,16 @@ private final class NotesCanvasView: NSView {
 
     override func layout() {
         super.layout()
+        let margin = CockpitPageLayout.margin
+        let gap = CockpitPageLayout.controlGap
+        let innerWidth = max(0, bounds.width - 2 * margin)
         let tabHeight = max(32, 30 * zoom)
-        let wrapWidth = min(bounds.width, 230 * zoom)
-        let narrow = bounds.width < 470 * zoom
-        let tabAreaWidth = max(0, bounds.width - (narrow ? 0 : wrapWidth))
-        let buttonX = max(8, tabAreaWidth - tabHeight - 8)
-        let scrollWidth = max(0, buttonX - 4)
-        var x: CGFloat = 8
+        let wrapWidth = min(innerWidth, 230 * zoom)
+        let narrow = innerWidth < 470 * zoom
+        let tabAreaWidth = max(0, innerWidth - (narrow ? 0 : wrapWidth + gap))
+        let buttonX = margin + max(0, tabAreaWidth - tabHeight)
+        let scrollWidth = max(0, buttonX - margin - gap)
+        var x: CGFloat = 0
         if let tabControl {
             let width = segmentWidth * CGFloat(tabTitles.count)
             tabControl.isHidden = tabTitles.isEmpty
@@ -708,21 +711,21 @@ private final class NotesCanvasView: NSView {
             verticalScrollerClass: nil, borderType: .noBorder,
             controlSize: tabScroll.horizontalScroller?.controlSize ?? .regular,
             scrollerStyle: tabScroll.scrollerStyle).height
-        tabScroll.frame = NSRect(x: 0, y: 0, width: scrollWidth, height: stripHeight)
+        tabScroll.frame = NSRect(x: margin, y: margin - 4, width: scrollWidth, height: stripHeight)
         tabDocument.frame = NSRect(x: 0, y: 0, width: max(x + 2, scrollWidth), height: contentHeight)
         tabScroll.tile()
-        newNoteButton.frame = NSRect(x: buttonX, y: 4, width: tabHeight, height: tabHeight)
-        let wrapY = narrow ? stripHeight + 4 : 4.0
-        let wrapX = max(8, bounds.width - wrapWidth)
+        newNoteButton.frame = NSRect(x: buttonX, y: margin, width: tabHeight, height: tabHeight)
+        let wrapY = narrow ? tabScroll.frame.maxY + gap : margin
+        let wrapX = bounds.width - margin - wrapWidth
         wordWrapLabel.frame = NSRect(x: wrapX, y: wrapY + 5, width: 76 * zoom, height: tabHeight)
-        wordWrapPopup.frame = NSRect(x: wrapX + 78 * zoom, y: wrapY, width: max(40, wrapWidth - 86 * zoom), height: tabHeight)
-        let noticeY = (narrow ? wrapY + tabHeight : stripHeight) + 4
-        let noticeWidth = max(0, bounds.width - 16)
+        wordWrapPopup.frame = NSRect(x: wrapX + 78 * zoom, y: wrapY, width: max(0, wrapWidth - 78 * zoom), height: tabHeight)
+        let noticeY = (narrow ? wrapY + tabHeight : tabScroll.frame.maxY) + gap
+        let noticeWidth = innerWidth
         let noticeHeight = max(22, disclosure.cell?.cellSize(forBounds:
             NSRect(x: 0, y: 0, width: noticeWidth, height: 1_000)).height ?? 22)
-        disclosure.frame = NSRect(x: 8, y: noticeY, width: noticeWidth, height: noticeHeight)
-        let editorY = noticeY + noticeHeight + 6
-        editorContainer.frame = NSRect(x: 0, y: editorY, width: bounds.width, height: max(0, bounds.height - editorY))
+        disclosure.frame = NSRect(x: margin, y: noticeY, width: noticeWidth, height: noticeHeight)
+        let editorY = noticeY + noticeHeight + CockpitPageLayout.sectionGap
+        editorContainer.frame = NSRect(x: margin, y: editorY, width: innerWidth, height: max(0, bounds.height - editorY - margin))
         editor?.frame = editorContainer.bounds
         emptyLabel.sizeToFit()
         emptyLabel.frame.origin = NSPoint(x: (bounds.width - emptyLabel.frame.width) / 2,

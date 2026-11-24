@@ -24,6 +24,7 @@ final class RemoteDesktopViewer: NSView {
         framebufferContainer.frame = bounds
         framebufferContainer.autoresizingMask = [.width, .height]
         framebufferContainer.onActivate = onActivate
+        framebufferContainer.session = session
         addSubview(framebufferContainer)
         coordinator.attach(to: framebufferContainer, session: session)
         coordinator.sync(generation: framebufferGeneration)
@@ -117,6 +118,40 @@ final class RemoteDesktopViewer: NSView {
 private final class RemoteFramebufferContainerView: NSView {
     var onActivate: () -> Void = {}
     weak var framebufferView: NSView?
+    weak var session: RemoteDesktopSession?
+
+    /// Runs before RoyalVNCKit forwards the shortcut. With "Share clipboard"
+    /// on, ⌘V types the Mac clipboard: Apple Screen Sharing ignores the RFB
+    /// cut-text RoyalVNCKit sends, so a forwarded ⌘V would only ever paste the
+    /// remote's own clipboard.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if let framebufferView, let session, event.type == .keyDown,
+           window?.firstResponder === framebufferView,
+           event.modifierFlags.intersection([.command, .shift, .control, .option]) == .command,
+           VNCPreferences.isClipboardRedirectionEnabled(id: session.connectionID) {
+            let pasteboard = NSPasteboard.general
+            switch event.charactersIgnoringModifiers?.lowercased() {
+            case "c", "x":
+                session.noteRemoteCopy(localChangeCount: pasteboard.changeCount)
+            case "v":
+                // Device-dependent flag bits say which Command key is held
+                // (NX_DEVICELCMDKEYMASK / NX_DEVICERCMDKEYMASK), matching the
+                // key RoyalVNCKit already pressed on the remote.
+                let flags = event.modifierFlags.rawValue
+                var held: [UInt32] = []
+                if flags & 0x08 != 0 { held.append(VNCKeyCode.command.rawValue) }
+                if flags & 0x10 != 0 { held.append(VNCKeyCode.rightCommand.rawValue) }
+                switch session.pasteText(pasteboard.string(forType: .string),
+                                         localChangeCount: pasteboard.changeCount, heldModifiers: held) {
+                case .typed: return true
+                case .rejected: NSSound.beep(); return true
+                case .forwardToRemote: break
+                }
+            default: break
+            }
+        }
+        return super.performKeyEquivalent(with: event)
+    }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         let target = super.hitTest(point)
