@@ -634,7 +634,7 @@ private final class RemoteConnectionViewController: NSViewController, NSTextFiel
         let options = RRUI.stack([save.row, automatic.row, highPerformance.row], spacing: 0)
         RRUI.fillWidth(options)
         let form = RRUI.stack([identity, usernameGroup, passwordGroup, options], spacing: 10)
-        form.setCustomSpacing(12, after: identity)
+        form.setCustomSpacing(10, after: identity)
         form.setCustomSpacing(8, after: passwordGroup)
         form.setCustomSpacing(8, after: options)
         if let error {
@@ -672,17 +672,16 @@ private final class RemoteConnectionViewController: NSViewController, NSTextFiel
             form.leadingAnchor.constraint(greaterThanOrEqualTo: document.leadingAnchor, constant: 20),
             form.trailingAnchor.constraint(lessThanOrEqualTo: document.trailingAnchor, constant: -20),
             form.centerXAnchor.constraint(equalTo: document.centerXAnchor),
-            form.topAnchor.constraint(greaterThanOrEqualTo: document.topAnchor, constant: 12),
-            form.bottomAnchor.constraint(lessThanOrEqualTo: document.bottomAnchor, constant: -12),
+            form.topAnchor.constraint(greaterThanOrEqualTo: document.topAnchor, constant: 8),
+            form.bottomAnchor.constraint(lessThanOrEqualTo: document.bottomAnchor, constant: -8),
             form.centerYAnchor.constraint(equalTo: document.centerYAnchor),
         ])
         RRUI.pin(scroll, to: content)
         RRUI.zoomControls(in: form)
-        // The form is built after the window computed its key view loop, so
-        // Tab has nowhere to go unless the order is spelled out.
-        let tabOrder: [NSView] = [username, password, save, automatic, highPerformance, clipboard]
+        // The window's computed key view loop would also stop on labels and
+        // skip the options, so Tab follows an explicit order instead.
         for toggle in [save, automatic, highPerformance] { toggle.alwaysTabStop = true }
-        for (index, stop) in tabOrder.enumerated() { stop.nextKeyView = tabOrder[(index + 1) % tabOrder.count] }
+        document.tabOrder = [username, password, save, automatic, highPerformance, clipboard]
     }
 
     @objc private func connect() {
@@ -735,6 +734,22 @@ private final class RemoteTabStopCheckbox: NSButton {
 @MainActor
 private final class RemoteCredentialsDocument: NSView {
     override var isFlipped: Bool { true }
+    /// The views Tab visits, in order, wrapping from the last to the first.
+    var tabOrder: [NSView] = [] { didSet { applyTabOrder() } }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else { return }
+        // A window computes its default key view loop from the view hierarchy
+        // when it is first shown, replacing any order set before that. Apply
+        // ours again once the window has done so.
+        applyTabOrder()
+        DispatchQueue.main.async { [weak self] in self?.applyTabOrder() }
+    }
+
+    private func applyTabOrder() {
+        for (index, stop) in tabOrder.enumerated() { stop.nextKeyView = tabOrder[(index + 1) % tabOrder.count] }
+    }
 }
 
 @MainActor
