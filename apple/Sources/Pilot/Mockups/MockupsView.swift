@@ -133,7 +133,7 @@ final class MockupsViewController: NSViewController, CockpitPanePresenting, Cock
         let rail = buildRail()
         let inspector = buildInspector()
         let position = buildPositionPanel()
-        let centerColumn = RRUI.stack([center, position, timeline], spacing: 8)
+        let centerColumn = RRUI.stack([center, position, timeline], spacing: CockpitPageLayout.sectionGap)
         centerColumn.alignment = .centerX
         for item in [center, position, timeline] { item.widthAnchor.constraint(equalTo: centerColumn.widthAnchor).isActive = true }
         center.setContentHuggingPriority(.defaultLow, for: .vertical)
@@ -202,10 +202,10 @@ final class MockupsViewController: NSViewController, CockpitPanePresenting, Cock
         devicePopup.setAccessibilityLabel("Device model")
         devicePopup.setAccessibilityIdentifier("mockups.device-picker")
         finishRow.orientation = .horizontal
-        finishRow.spacing = 6
+        finishRow.spacing = CockpitPageLayout.controlGap
         gallery.orientation = .vertical
         gallery.alignment = .centerX
-        gallery.spacing = 6
+        gallery.spacing = CockpitPageLayout.controlGap
         let scroll = Self.scrolling(gallery)
         scroll.setAccessibilityIdentifier("mockups.layouts")
         screenPopup.controlSize = .small
@@ -227,10 +227,10 @@ final class MockupsViewController: NSViewController, CockpitPanePresenting, Cock
             RRUI.label("Screen", size: 15, weight: .semibold), screenPopup,
             RRUI.stack([chooseScreenshot, clear], axis: .horizontal),
             RRUI.label("Layouts", size: 15, weight: .semibold), scroll,
-        ], spacing: 10)
-        stack.edgeInsets = NSEdgeInsets(top: 16, left: 12, bottom: 12, right: 12)
+        ], spacing: CockpitPageLayout.controlGap)
+        stack.edgeInsets = CockpitPageLayout.panelInsets
         for child in [aspectPopup, devicePopup, screenPopup, scroll] {
-            child.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -24).isActive = true
+            child.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -2 * CockpitPageLayout.margin).isActive = true
         }
         return stack
     }
@@ -260,7 +260,7 @@ final class MockupsViewController: NSViewController, CockpitPanePresenting, Cock
             row([Self.labeled("Move X", positionX), Self.labeled("Move Y", positionY), Self.labeled("Size", scale)]),
             row([openRow, status, NSView()]),
         ], spacing: 8)
-        stack.edgeInsets = NSEdgeInsets(top: 4, left: 24, bottom: 8, right: 24)
+        stack.edgeInsets = NSEdgeInsets(top: 0, left: CockpitPageLayout.margin, bottom: 0, right: CockpitPageLayout.margin)
         stack.setAccessibilityIdentifier("mockups.position")
         RRUI.fillWidth(stack)
         stack.setContentHuggingPriority(.required, for: .vertical)
@@ -275,6 +275,9 @@ final class MockupsViewController: NSViewController, CockpitPanePresenting, Cock
         clip.drawsBackground = false
         scroll.contentView = clip
         scroll.documentView = content
+        // Swatch height depends on the viewport width. Reserve the legacy
+        // scrollbar gutter so showing it cannot change whether it is needed.
+        scroll.autohidesScrollers = false
         scroll.automaticallyAdjustsContentInsets = false
         content.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -321,8 +324,8 @@ final class MockupsViewController: NSViewController, CockpitPanePresenting, Cock
             chooseBackground,
             shadowPanel,
             RRUI.spacer(),
-        ], spacing: 12)
-        stack.edgeInsets = NSEdgeInsets(top: 16, left: 14, bottom: 16, right: 14)
+        ], spacing: CockpitPageLayout.sectionGap)
+        stack.edgeInsets = CockpitPageLayout.panelInsets
         RRUI.fillWidth(stack)
         return Self.scrolling(stack)
     }
@@ -619,7 +622,7 @@ final class MockupCenterView: NSView {
     override func layout() {
         super.layout()
         guard let document else { return }
-        stage?.frame = MockupAspectRatio.fit(ratio: document.aspect.ratio, in: bounds, inset: 24)
+        stage?.frame = MockupAspectRatio.fit(ratio: document.aspect.ratio, in: bounds, inset: CockpitPageLayout.margin)
     }
 }
 
@@ -644,7 +647,11 @@ final class MockupSwatchGrid: NSView {
         let side: CGFloat = bounds.width > 0 ? cell : 36
         return NSSize(width: NSView.noIntrinsicMetric, height: CGFloat(rows) * (side + spacing))
     }
-    override func layout() { super.layout(); invalidateIntrinsicContentSize() }
+    override func setFrameSize(_ newSize: NSSize) {
+        let widthChanged = frame.width != newSize.width
+        super.setFrameSize(newSize)
+        if widthChanged { invalidateIntrinsicContentSize() }
+    }
 
     private func rect(_ index: Int) -> CGRect {
         CGRect(x: CGFloat(index % columns) * (cell + spacing), y: CGFloat(index / columns) * (cell + spacing), width: cell, height: cell)

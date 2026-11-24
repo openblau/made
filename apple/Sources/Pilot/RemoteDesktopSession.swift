@@ -140,6 +140,24 @@ final class RemoteDesktopSession {
         return keyboardInput.sendEnter(sessionID: sessionID)
     }
 
+    /// The user copied or cut on the remote, so its clipboard is now the newer
+    /// one until the Mac pasteboard changes again.
+    func noteRemoteCopy(localChangeCount: Int) {
+        guard inputSessionID != nil else { return }
+        keyboardInput.noteRemoteCopy(localChangeCount: localChangeCount)
+    }
+
+    /// Types the Mac clipboard into the remote for a ⌘V; see
+    /// `RemoteDesktopKeyboardInput.pasteText`.
+    func pasteText(
+        _ text: String?,
+        localChangeCount: Int,
+        heldModifiers: [UInt32]
+    ) -> RemoteDesktopKeyboardInput.PasteOutcome {
+        guard inputSessionID != nil else { return .forwardToRemote }
+        return keyboardInput.pasteText(text, localChangeCount: localChangeCount, heldModifiers: heldModifiers)
+    }
+
     func connect(
         host: String,
         port: Int,

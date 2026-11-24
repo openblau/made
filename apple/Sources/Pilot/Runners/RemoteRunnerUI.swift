@@ -194,6 +194,11 @@ final class RRSwitch: NSSwitch {
 
     var title: String { label.stringValue }
 
+    /// Joins the Tab order even when Keyboard Navigation is off in System
+    /// Settings, for forms where the switches follow text fields.
+    var alwaysTabStop = false
+    override var canBecomeKeyView: Bool { (alwaysTabStop && isEnabled && !isHiddenOrHasHiddenAncestor) || super.canBecomeKeyView }
+
     override var isEnabled: Bool {
         didSet { label.textColor = isEnabled ? .labelColor : .disabledControlTextColor }
     }

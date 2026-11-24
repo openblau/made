@@ -47,14 +47,14 @@ final class MockupTimelineView: NSView {
         let transport = RRUI.stack([
             playButton, previousButton, nextButton, addButton, deleteButton,
             timeLabel, RRUI.spacer(), RRUI.label("Preset", size: 11, color: .secondaryLabelColor), motionPopup,
-        ], axis: .horizontal, spacing: 7)
+        ], axis: .horizontal, spacing: CockpitPageLayout.controlGap)
         let transition = RRUI.stack([
             RRUI.label("Transition", size: 11, color: .secondaryLabelColor), easingPopup,
             RRUI.label("Duration", size: 11, color: .secondaryLabelColor), durationSlider, durationLabel,
             RRUI.spacer(),
-        ], axis: .horizontal, spacing: 7)
-        let stack = RRUI.stack([transport, transition, trackView], spacing: 6)
-        stack.edgeInsets = NSEdgeInsets(top: 8, left: 9, bottom: 8, right: 9)
+        ], axis: .horizontal, spacing: CockpitPageLayout.controlGap)
+        let stack = RRUI.stack([transport, transition, trackView], spacing: CockpitPageLayout.controlGap)
+        stack.edgeInsets = NSEdgeInsets(top: 0, left: CockpitPageLayout.margin, bottom: CockpitPageLayout.margin, right: CockpitPageLayout.margin)
         RRUI.pin(stack, to: self, inset: 0)
         trackView.heightAnchor.constraint(equalToConstant: 88).isActive = true
         heightAnchor.constraint(equalToConstant: 170).isActive = true

@@ -184,16 +184,17 @@ final class AgenticUseViewController: NSViewController, CockpitPanePresenting, C
         let zoom = AgenticUseLayout.zoom
         // The time frames, refresh and date range live in the window toolbar
         // and title, so the page starts at its content.
-        let headerHeight: CGFloat = 8 * zoom
-        let warningHeight: CGFloat = warningLabel.isHidden ? 0 : 48 * zoom
+        let margin = CockpitPageLayout.margin
+        let innerWidth = max(0, width - 2 * margin)
+        let warningHeight: CGFloat = warningLabel.isHidden ? 0 : margin + 48 * zoom
         warningLabel.font = AgenticUseLayout.font(.body)
-        warningLabel.frame = NSRect(x: 16, y: headerHeight + 4, width: max(0, width - 76), height: max(0, warningHeight - 4))
-        warningDismiss.frame = NSRect(x: width - 44, y: headerHeight + 8, width: 28, height: 26)
+        warningLabel.frame = NSRect(x: margin, y: margin, width: max(0, innerWidth - 28 - CockpitPageLayout.controlGap), height: max(0, warningHeight - margin))
+        warningDismiss.frame = NSRect(x: width - margin - 28, y: margin, width: 28, height: 26)
         let footerHeight: CGFloat = freshnessLabel.stringValue.isEmpty ? 0 : 26 * zoom
         freshnessLabel.font = AgenticUseLayout.font(.meta)
-        freshnessLabel.frame = NSRect(x: 16, y: view.bounds.height - footerHeight, width: max(0, width - 32), height: footerHeight)
-        let top = headerHeight + warningHeight
-        scroll.frame = NSRect(x: 0, y: top, width: width, height: max(0, view.bounds.height - top - footerHeight))
+        freshnessLabel.frame = NSRect(x: margin, y: view.bounds.height - margin - footerHeight, width: innerWidth, height: footerHeight)
+        let top = warningHeight
+        scroll.frame = NSRect(x: 0, y: top, width: width, height: max(0, view.bounds.height - top - footerHeight - (footerHeight > 0 ? margin : 0)))
         if let dashboard {
             dashboard.setFrameSize(NSSize(width: scroll.contentSize.width, height: dashboard.contentHeight(for: scroll.contentSize.width)))
             dashboard.needsLayout = true
@@ -359,13 +360,15 @@ final class AgenticUseDashboard: AgenticUseFlippedView {
         needsLayout = true
     }
     func contentHeight(for width: CGFloat) -> CGFloat {
-        let inner = max(0, width - 16)
-        let top = kpis.preferredHeight(for: inner) + chart.preferredHeight(for: inner) + 24
+        let margin = CockpitPageLayout.margin
+        let gap = CockpitPageLayout.sectionGap
+        let inner = max(0, width - 2 * margin)
+        let top = kpis.preferredHeight(for: inner) + chart.preferredHeight(for: inner) + margin + 2 * gap
         let twoColumns = usesTwoColumns(for: width)
-        let column = twoColumns ? (inner - 8) / 2 : inner
-        let left = flow.preferredHeight(for: column) + insights.preferredHeight(for: column) + 8
-        let right = breakdown.preferredHeight(for: column) + models.preferredHeight(for: column) + 8
-        return top + (twoColumns ? max(left, right) : left + right + 8) + 74 * AgenticUseLayout.zoom
+        let column = twoColumns ? (inner - gap) / 2 : inner
+        let left = flow.preferredHeight(for: column) + insights.preferredHeight(for: column) + gap
+        let right = breakdown.preferredHeight(for: column) + models.preferredHeight(for: column) + gap
+        return top + (twoColumns ? max(left, right) : left + right + gap) + gap + 64 * AgenticUseLayout.zoom + margin
     }
     override func layout() {
         super.layout()
@@ -377,21 +380,23 @@ final class AgenticUseDashboard: AgenticUseFlippedView {
         let oldHeight = bounds.height
         layoutWidth = bounds.width
         layoutZoom = AgenticUseLayout.zoom
-        let width = max(0, bounds.width - 16)
-        var y: CGFloat = 8
+        let margin = CockpitPageLayout.margin
+        let gap = CockpitPageLayout.sectionGap
+        let width = max(0, bounds.width - 2 * margin)
+        var y = margin
         func place(_ child: NSView, height: CGFloat) {
-            child.frame = NSRect(x: 8, y: y, width: width, height: height)
-            y += height + 8
+            child.frame = NSRect(x: margin, y: y, width: width, height: height)
+            y += height + gap
         }
         place(kpis, height: kpis.preferredHeight(for: width))
         place(chart, height: chart.preferredHeight(for: width))
         if usesTwoColumns(for: bounds.width) {
-            let column = (width - 8) / 2
-            flow.frame = NSRect(x: 8, y: y, width: column, height: flow.preferredHeight(for: column))
-            insights.frame = NSRect(x: 8, y: flow.frame.maxY + 8, width: column, height: insights.preferredHeight(for: column))
-            breakdown.frame = NSRect(x: 16 + column, y: y, width: column, height: breakdown.preferredHeight(for: column))
-            models.frame = NSRect(x: 16 + column, y: breakdown.frame.maxY + 8, width: column, height: models.preferredHeight(for: column))
-            y = max(insights.frame.maxY, models.frame.maxY) + 8
+            let column = (width - gap) / 2
+            flow.frame = NSRect(x: margin, y: y, width: column, height: flow.preferredHeight(for: column))
+            insights.frame = NSRect(x: margin, y: flow.frame.maxY + gap, width: column, height: insights.preferredHeight(for: column))
+            breakdown.frame = NSRect(x: margin + gap + column, y: y, width: column, height: breakdown.preferredHeight(for: column))
+            models.frame = NSRect(x: margin + gap + column, y: breakdown.frame.maxY + gap, width: column, height: models.preferredHeight(for: column))
+            y = max(insights.frame.maxY, models.frame.maxY) + gap
         } else {
             place(flow, height: flow.preferredHeight(for: width))
             place(breakdown, height: breakdown.preferredHeight(for: width))
@@ -399,7 +404,7 @@ final class AgenticUseDashboard: AgenticUseFlippedView {
             place(insights, height: insights.preferredHeight(for: width))
         }
         footnote.font = AgenticUseLayout.font(.meta)
-        footnote.frame = NSRect(x: 12, y: y, width: max(0, width - 8), height: 64 * AgenticUseLayout.zoom)
+        footnote.frame = NSRect(x: margin, y: y, width: width, height: 64 * AgenticUseLayout.zoom)
         if animate {
             let targets = subviews.map(\.frame)
             let targetHeight = contentHeight(for: bounds.width)
@@ -416,6 +421,6 @@ final class AgenticUseDashboard: AgenticUseFlippedView {
     }
 
     private func usesTwoColumns(for width: CGFloat) -> Bool {
-        (width - 24) / 2 >= models.minimumCardWidth
+        (width - 2 * CockpitPageLayout.margin - CockpitPageLayout.sectionGap) / 2 >= models.minimumCardWidth
     }
 }

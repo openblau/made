@@ -143,7 +143,10 @@ final class CockpitWindowController: NSWindowController, NSWindowDelegate, NSToo
         if isLive { splitController.splitView.autosaveName = surface == .main ? "cockpit-main-columns-v2" : "cockpit-extendo-columns-v2" }
         if surface == .main {
             let sidebar = NSSplitViewItem(sidebarWithViewController: sidebarContainer)
-            sidebar.minimumThickness = 180
+            // The sidebar's toolbar region holds the window controls, the sidebar
+            // toggle, and New Workspace, which need 184pt. Any narrower and AppKit
+            // clips New Workspace behind an overflow chevron over the content.
+            sidebar.minimumThickness = 192
             sidebar.maximumThickness = 420
             sidebar.canCollapse = true
             splitController.addSplitViewItem(sidebar)
@@ -562,9 +565,10 @@ final class CockpitWindowController: NSWindowController, NSWindowDelegate, NSToo
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         let leading: [NSToolbarItem.Identifier] = surface == .main
-            // A narrow sidebar only has room for the window controls and toggle.
-            // Let New Workspace use the content region beside the divider.
-            ? [ToolbarID.sidebar, .sidebarTrackingSeparator, ToolbarID.newWorkspace] : []
+            // New Workspace sits at the trailing edge of the sidebar's toolbar
+            // region, beside the list it adds to. Past the divider it would trail
+            // the window title and land against the centered controls instead.
+            ? [ToolbarID.sidebar, .flexibleSpace, ToolbarID.newWorkspace, .sidebarTrackingSeparator] : []
         // The flexible space after the tracking separator keeps the pane
         // tools at the window's trailing edge while the inspector is open,
         // instead of at the inspector's leading edge.

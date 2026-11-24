@@ -291,6 +291,20 @@ struct RemoteDesktopGroupLayoutTests {
             let highPerformance = descendants(form).compactMap { $0 as? RRSwitch }.filter { $0.title == "High Performance" }
             #expect(highPerformance.count == 1)
             #expect(highPerformance.first?.state == .off)
+            // Tab walks username, password, the three switches, then the
+            // footer's Share clipboard checkbox, and wraps.
+            let password = try #require(descendants(form).compactMap { $0 as? NSSecureTextField }.first)
+            let username = try #require(descendants(form).compactMap { $0 as? NSTextField }
+                .first { $0.isEditable && !($0 is NSSecureTextField) })
+            var stop: NSView? = username.nextKeyView
+            #expect(stop === password)
+            for title in ["Save password", "Connect automatically", "High Performance"] {
+                stop = stop?.nextKeyView
+                #expect((stop as? RRSwitch)?.title == title)
+            }
+            stop = stop?.nextKeyView
+            #expect((stop as? NSButton)?.title == "Share clipboard")
+            #expect(stop?.nextKeyView === username)
             #expect(form.autohidesScrollers)
             if size.height == 800 { #expect(form.verticalScroller?.isHidden == true) }
             let connect = try #require(descendants(form).compactMap { $0 as? NSButton }.first { $0.title == "Connect" })

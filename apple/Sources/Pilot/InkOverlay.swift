@@ -146,6 +146,7 @@ final class InkOverlayViewController: NSViewController, @MainActor PaperMarkupVi
         let root = InkAnnotationView(frame: NSRect(x: 0, y: 0, width: 640, height: 480))
         root.annotationUndoManager = annotationUndoManager
         root.onLayout = { [weak self] bounds in self?.updateCanvasBounds(bounds) }
+        root.onWindowChange = { [weak self] window in self?.updateKeyMonitor(for: window) }
         view = root
         markupController.delegate = self
         markupController.isEditable = true
@@ -215,16 +216,23 @@ final class InkOverlayViewController: NSViewController, @MainActor PaperMarkupVi
     override func viewDidAppear() {
         super.viewDidAppear()
         view.window?.makeFirstResponder(markupController)
-        guard keyMonitor == nil else { return }
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, let window = self.view.window, event.window === window, event.keyCode == 53 else { return event }
+    }
+
+    // Cockpit mounts the canvas directly above the window chrome. Track the
+    // actual attachment even when controller appearance callbacks do not run.
+    private func updateKeyMonitor(for window: NSWindow?) {
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor); self.keyMonitor = nil }
+        guard let window else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak window] event in
+            guard let self, let window, (event.window ?? NSApp.keyWindow) === window,
+                  event.keyCode == 53,
+                  event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty else { return event }
             self.dismissInk()
             return nil
         }
     }
 
     override func viewWillDisappear() {
-        if let keyMonitor { NSEvent.removeMonitor(keyMonitor); self.keyMonitor = nil }
         annotationUndoManager.removeAllActions()
         super.viewWillDisappear()
     }
@@ -287,6 +295,12 @@ final class InkOverlayViewController: NSViewController, @MainActor PaperMarkupVi
 private final class InkAnnotationView: NSView {
     var annotationUndoManager: UndoManager?
     var onLayout: ((CGRect) -> Void)?
+    var onWindowChange: ((NSWindow?) -> Void)?
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        onWindowChange?(window)
+    }
+
     override var undoManager: UndoManager? { annotationUndoManager }
     override func layout() {
         onLayout?(bounds)
